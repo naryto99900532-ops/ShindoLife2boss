@@ -1,6 +1,8 @@
+// players.js
 class PlayersManager {
     constructor() {
         this.players = [];
+        this.supabase = window.SupabaseConfig.supabase;
         this.initEventListeners();
         this.loadPlayers();
     }
@@ -41,19 +43,24 @@ class PlayersManager {
     
     async loadPlayers() {
         try {
-            const { data: players, error } = await supabase
+            const { data: players, error } = await this.supabase
                 .from('players')
                 .select('*')
                 .order('score', { ascending: false });
             
-            if (error) throw error;
+            if (error) {
+                console.error('Ошибка загрузки игроков:', error);
+                throw error;
+            }
             
             this.players = players || [];
             this.renderPlayers();
             
             // Обновляем статистику если пользователь админ
-            if (window.authManager.currentUser?.role === USER_ROLES.ADMIN || 
-                window.authManager.currentUser?.role === USER_ROLES.OWNER) {
+            const currentUser = window.authManager?.currentUser;
+            if (currentUser && 
+                (currentUser.role === window.SupabaseConfig.USER_ROLES.ADMIN || 
+                 currentUser.role === window.SupabaseConfig.USER_ROLES.OWNER)) {
                 this.updateAdminStats();
             }
             
@@ -65,6 +72,8 @@ class PlayersManager {
     
     renderPlayers() {
         const container = document.getElementById('players-list');
+        
+        if (!container) return;
         
         if (this.players.length === 0) {
             container.innerHTML = `
@@ -78,26 +87,26 @@ class PlayersManager {
         container.innerHTML = this.players.map(player => `
             <div class="player-card">
                 <div class="player-header">
-                    <div class="player-avatar">${player.username.charAt(0)}</div>
+                    <div class="player-avatar">${player.username?.charAt(0) || '?'}</div>
                     <div class="player-info">
-                        <h3>${player.username}</h3>
+                        <h3>${player.username || 'Неизвестно'}</h3>
                         <span class="player-rank ${this.getRankClass(player.pvp_rank)}">
-                            ${player.pvp_rank}
+                            ${player.pvp_rank || 'B+'}
                         </span>
                         ${player.is_vip ? '<span class="vip-badge">VIP</span>' : ''}
                     </div>
                 </div>
                 <div class="player-stats">
                     <div class="stat">
-                        <span class="stat-value">${player.total_wins}</span>
+                        <span class="stat-value">${player.total_wins || 0}</span>
                         <span class="stat-label">Побед</span>
                     </div>
                     <div class="stat">
-                        <span class="stat-value">${player.total_losses}</span>
+                        <span class="stat-value">${player.total_losses || 0}</span>
                         <span class="stat-label">Поражений</span>
                     </div>
                     <div class="stat">
-                        <span class="stat-value">${player.score}</span>
+                        <span class="stat-value">${player.score || 0}</span>
                         <span class="stat-label">Очки</span>
                     </div>
                 </div>
@@ -124,21 +133,27 @@ class PlayersManager {
     async updateAdminStats() {
         try {
             // Общее количество игроков
-            const { count: totalPlayers } = await supabase
+            const { count: totalPlayers, error: countError } = await this.supabase
                 .from('players')
-                .select('*', { count: 'exact' });
+                .select('*', { count: 'exact', head: true });
+            
+            if (countError) throw countError;
             
             // Количество онлайн (за последние 15 минут)
             const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-            const { count: onlinePlayers } = await supabase
+            const { count: onlinePlayers, error: onlineError } = await this.supabase
                 .from('players')
-                .select('*', { count: 'exact' })
+                .select('*', { count: 'exact', head: true })
                 .gt('updated_at', fifteenMinutesAgo);
             
+            if (onlineError) throw onlineError;
+            
             // Общее количество матчей
-            const { data: players } = await supabase
+            const { data: players, error: playersError } = await this.supabase
                 .from('players')
                 .select('total_wins, total_losses');
+            
+            if (playersError) throw playersError;
             
             let totalMatches = 0;
             if (players) {
@@ -193,7 +208,7 @@ class PlayersManager {
                     <div class="detail-row">
                         <span class="detail-label">Дата регистрации:</span>
                         <span class="detail-value">
-                            ${new Date(player.created_at).toLocaleDateString('ru-RU')}
+                            ${player.created_at ? new Date(player.created_at).toLocaleDateString('ru-RU') : 'Неизвестно'}
                         </span>
                     </div>
                 </div>
@@ -220,6 +235,8 @@ class PlayersManager {
     
     showNotification(message, type = 'info') {
         const notification = document.getElementById('notification');
+        if (!notification) return;
+        
         notification.textContent = message;
         notification.className = `notification ${type}`;
         notification.style.display = 'block';
@@ -230,7 +247,7 @@ class PlayersManager {
     }
 }
 
-// Инициализация
+// Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     window.playersManager = new PlayersManager();
 });
