@@ -1,5 +1,8 @@
+// admin.js
 class AdminManager {
     constructor() {
+        this.supabase = window.SupabaseConfig.supabase;
+        this.USER_ROLES = window.SupabaseConfig.USER_ROLES;
         this.initEventListeners();
     }
     
@@ -28,6 +31,8 @@ class AdminManager {
     }
     
     showAddPlayerForm() {
+        if (!window.playersManager) return;
+        
         window.playersManager.showModal(
             'Добавить игрока',
             `
@@ -80,25 +85,29 @@ class AdminManager {
         const isVip = document.getElementById('new-player-vip').checked;
         
         if (!username) {
-            window.playersManager.showNotification('Введите имя игрока', 'error');
+            this.showNotification('Введите имя игрока', 'error');
             return;
         }
         
         try {
             // Проверяем, существует ли игрок
-            const { data: existingPlayer } = await supabase
+            const { data: existingPlayer, error: checkError } = await this.supabase
                 .from('players')
                 .select('id')
                 .eq('username', username)
                 .single();
             
             if (existingPlayer) {
-                window.playersManager.showNotification('Игрок уже существует', 'error');
+                this.showNotification('Игрок уже существует', 'error');
                 return;
             }
             
+            if (checkError && checkError.code !== 'PGRST116') {
+                throw checkError;
+            }
+            
             // Добавляем игрока
-            const { data: player, error } = await supabase
+            const { data: player, error } = await this.supabase
                 .from('players')
                 .insert([
                     {
@@ -115,7 +124,9 @@ class AdminManager {
             if (error) throw error;
             
             // Обновляем список
-            await window.playersManager.loadPlayers();
+            if (window.playersManager) {
+                await window.playersManager.loadPlayers();
+            }
             
             // Закрываем модальное окно
             document.getElementById('modal').style.display = 'none';
@@ -123,11 +134,11 @@ class AdminManager {
             // Логируем действие
             await this.logAction(`Добавлен игрок: ${username}`);
             
-            window.playersManager.showNotification('Игрок успешно добавлен', 'success');
+            this.showNotification('Игрок успешно добавлен', 'success');
             
         } catch (error) {
             console.error('Ошибка добавления игрока:', error);
-            window.playersManager.showNotification('Ошибка при добавлении игрока', 'error');
+            this.showNotification('Ошибка при добавлении игрока', 'error');
         }
     }
     
@@ -142,17 +153,26 @@ class AdminManager {
         return rankScores[rank] || 100;
     }
     
+    showEditPlayerForm() {
+        this.showNotification('Функция редактирования в разработке', 'info');
+    }
+    
+    showPvPManagement() {
+        this.showNotification('Функция управления PvP в разработке', 'info');
+    }
+    
     async logAction(action) {
-        if (!window.authManager.currentUser) return;
+        const currentUser = window.authManager?.currentUser;
+        if (!currentUser) return;
         
         try {
-            await supabase
+            await this.supabase
                 .from('system_logs')
                 .insert([
                     {
-                        user_id: window.authManager.currentUser.id,
+                        user_id: currentUser.id,
                         action: action,
-                        details: JSON.stringify({ role: window.authManager.currentUser.role }),
+                        details: JSON.stringify({ role: currentUser.role }),
                         timestamp: new Date().toISOString()
                     }
                 ]);
@@ -160,12 +180,27 @@ class AdminManager {
             console.error('Ошибка записи лога:', error);
         }
     }
+    
+    showNotification(message, type = 'info') {
+        const notification = document.getElementById('notification');
+        if (!notification) return;
+        
+        notification.textContent = message;
+        notification.className = `notification ${type}`;
+        notification.style.display = 'block';
+        
+        setTimeout(() => {
+            notification.style.display = 'none';
+        }, 3000);
+    }
 }
 
-// Инициализация
+// Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.authManager.currentUser?.role === USER_ROLES.ADMIN || 
-        window.authManager.currentUser?.role === USER_ROLES.OWNER) {
+    const currentUser = window.authManager?.currentUser;
+    if (currentUser && 
+        (currentUser.role === window.SupabaseConfig.USER_ROLES.ADMIN || 
+         currentUser.role === window.SupabaseConfig.USER_ROLES.OWNER)) {
         window.adminManager = new AdminManager();
     }
 });
