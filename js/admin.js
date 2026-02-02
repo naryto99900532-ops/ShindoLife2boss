@@ -165,4 +165,7 @@ class AdminManager {
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
     if (window.authManager.currentUser?.role === USER_ROLES.ADMIN || 
-        window
+        window.authManager.currentUser?.role === USER_ROLES.OWNER) {
+        window.adminManager = new AdminManager();
+    }
+});
