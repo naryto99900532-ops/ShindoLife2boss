@@ -58,11 +58,21 @@ class AuthManager {
         document.getElementById('auth-error').textContent = '';
     }
     
-    showAuthError(message) {
-        document.getElementById('auth-error').textContent = message;
-        document.getElementById('auth-error').style.display = 'block';
+    // В методе showAuthError добавьте:
+showAuthError(message) {
+    const errorElement = document.getElementById('auth-error');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        // Добавляем стили для ошибки
+        errorElement.style.backgroundColor = '#fee';
+        errorElement.style.color = '#c33';
+        errorElement.style.padding = '10px';
+        errorElement.style.borderRadius = '6px';
+        errorElement.style.marginBottom = '15px';
+        errorElement.style.border = '1px solid #fcc';
     }
-    
+}
     async login() {
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value.trim();
