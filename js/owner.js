@@ -1,216 +1,217 @@
-class OwnerManager {
-    constructor() {
-        this.admins = [];
-        this.initEventListeners();
-        this.loadAdmins();
+/* Добавьте эти стили в конец файла styles.css */
+
+/* Кнопки */
+.btn-primary {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+    text-align: center;
+}
+
+.btn-primary:hover {
+    background: #5a67d8;
+}
+
+.btn-secondary {
+    background: #e2e8f0;
+    color: #4a5568;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+    text-align: center;
+}
+
+.btn-secondary:hover {
+    background: #cbd5e0;
+}
+
+.btn-danger {
+    background: #e53e3e;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c53030;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.btn-logout {
+    background: #e53e3e;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+    margin-top: auto;
+}
+
+.btn-logout:hover {
+    background: #c53030;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: #667eea;
+    cursor: pointer;
+    font-size: inherit;
+    text-decoration: underline;
+}
+
+.btn-link:hover {
+    color: #5a67d8;
+}
+
+/* Модальные окна */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    font-size: 28px;
+    cursor: pointer;
+    color: #718096;
+}
+
+.modal-close:hover {
+    color: #4a5568;
+}
+
+/* Формы в модальных окнах */
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.form-group input,
+.form-group select {
+    padding: 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+/* Уведомления */
+.notification {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 6px;
+    color: white;
+    z-index: 1001;
+    animation: slideIn 0.3s ease;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.notification.success {
+    background: #38a169;
+}
+
+.notification.error {
+    background: #e53e3e;
+}
+
+.notification.warning {
+    background: #d69e2e;
+}
+
+.notification.info {
+    background: #3182ce;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
     }
-    
-    initEventListeners() {
-        // Назначение администратора
-        document.getElementById('assign-admin-btn').addEventListener('click', () => {
-            this.assignAdmin();
-        });
-        
-        // Снятие администратора
-        document.getElementById('remove-admin-btn').addEventListener('click', () => {
-            this.removeAdmin();
-        });
-    }
-    
-    async loadAdmins() {
-        try {
-            const { data: admins, error } = await supabase
-                .from('users')
-                .select('*')
-                .in('role', [USER_ROLES.ADMIN, USER_ROLES.OWNER])
-                .order('username');
-            
-            if (error) throw error;
-            
-            this.admins = admins || [];
-            this.renderAdminList();
-            this.renderAdminSelect();
-            
-        } catch (error) {
-            console.error('Ошибка загрузки администраторов:', error);
-        }
-    }
-    
-    renderAdminList() {
-        const container = document.getElementById('current-admins-list');
-        
-        if (this.admins.length === 0) {
-            container.innerHTML = '<p class="empty-message">Администраторы не назначены</p>';
-            return;
-        }
-        
-        container.innerHTML = this.admins.map(admin => `
-            <div class="admin-card">
-                <div class="admin-info">
-                    <div class="admin-avatar">${admin.username.charAt(0)}</div>
-                    <div>
-                        <div class="admin-name">${admin.username}</div>
-                        <div class="admin-role">
-                            ${admin.role === USER_ROLES.OWNER ? '👑 Владелец' : '🔧 Администратор'}
-                        </div>
-                        <div class="admin-email">${admin.email}</div>
-                    </div>
-                </div>
-                <div class="admin-actions">
-                    ${admin.role !== USER_ROLES.OWNER ? `
-                        <button class="btn-danger btn-small" 
-                                onclick="ownerManager.confirmRemoveAdmin('${admin.id}', '${admin.username}')">
-                            Снять
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-        `).join('');
-    }
-    
-    renderAdminSelect() {
-        const select = document.getElementById('admin-list');
-        const nonOwnerAdmins = this.admins.filter(admin => admin.role !== USER_ROLES.OWNER);
-        
-        select.innerHTML = '<option value="">Выберите администратора</option>' +
-            nonOwnerAdmins.map(admin => `
-                <option value="${admin.id}">${admin.username} (${admin.email})</option>
-            `).join('');
-    }
-    
-    async assignAdmin() {
-        const username = document.getElementById('assign-admin-name').value.trim();
-        
-        if (!username) {
-            this.showNotification('Введите имя пользователя', 'error');
-            return;
-        }
-        
-        try {
-            // Ищем пользователя
-            const { data: user, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('username', username)
-                .single();
-            
-            if (error || !user) {
-                this.showNotification('Пользователь не найден', 'error');
-                return;
-            }
-            
-            // Проверяем, не является ли уже администратором
-            if (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.OWNER) {
-                this.showNotification('Пользователь уже является администратором', 'warning');
-                return;
-            }
-            
-            // Подтверждение
-            if (!confirm(`Назначить пользователя "${username}" администратором?`)) {
-                return;
-            }
-            
-            // Обновляем роль
-            const { error: updateError } = await supabase
-                .from('users')
-                .update({ role: USER_ROLES.ADMIN })
-                .eq('id', user.id);
-            
-            if (updateError) throw updateError;
-            
-            // Обновляем список
-            await this.loadAdmins();
-            
-            // Очищаем поле
-            document.getElementById('assign-admin-name').value = '';
-            
-            // Логируем
-            await this.logAction(`Назначен администратор: ${username}`);
-            
-            this.showNotification(`Пользователь ${username} назначен администратором`, 'success');
-            
-        } catch (error) {
-            console.error('Ошибка назначения администратора:', error);
-            this.showNotification('Ошибка при назначении администратора', 'error');
-        }
-    }
-    
-    async removeAdmin() {
-        const adminId = document.getElementById('admin-list').value;
-        
-        if (!adminId) {
-            this.showNotification('Выберите администратора', 'error');
-            return;
-        }
-        
-        const admin = this.admins.find(a => a.id === adminId);
-        if (!admin) return;
-        
-        await this.confirmRemoveAdmin(adminId, admin.username);
-    }
-    
-    async confirmRemoveAdmin(adminId, username) {
-        if (!confirm(`Снять администратора "${username}"?`)) {
-            return;
-        }
-        
-        try {
-            // Возвращаем роль "игрок"
-            const { error } = await supabase
-                .from('users')
-                .update({ role: USER_ROLES.PLAYER })
-                .eq('id', adminId);
-            
-            if (error) throw error;
-            
-            // Обновляем списки
-            await this.loadAdmins();
-            
-            // Логируем
-            await this.logAction(`Снят администратор: ${username}`);
-            
-            this.showNotification(`Администратор ${username} снят`, 'success');
-            
-        } catch (error) {
-            console.error('Ошибка снятия администратора:', error);
-            this.showNotification('Ошибка при снятии администратора', 'error');
-        }
-    }
-    
-    async logAction(action) {
-        if (!window.authManager.currentUser) return;
-        
-        try {
-            await supabase
-                .from('system_logs')
-                .insert([
-                    {
-                        user_id: window.authManager.currentUser.id,
-                        action: action,
-                        details: JSON.stringify({ role: USER_ROLES.OWNER }),
-                        timestamp: new Date().toISOString()
-                    }
-                ]);
-        } catch (error) {
-            console.error('Ошибка записи лога:', error);
-        }
-    }
-    
-    showNotification(message, type = 'info') {
-        const notification = document.getElementById('notification');
-        notification.textContent = message;
-        notification.className = `notification ${type}`;
-        notification.style.display = 'block';
-        
-        setTimeout(() => {
-            notification.style.display = 'none';
-        }, 3000);
+    to {
+        transform: translateX(0);
+        opacity: 1;
     }
 }
 
-// Инициализация
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.authManager.currentUser?.role === USER_ROLES.OWNER) {
-        window.ownerManager = new OwnerManager();
-    }
-});
+/* Сообщения об отсутствии данных */
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #718096;
+    background: white;
+    border-radius: 8px;
+    border: 2px dashed #e2e8f0;
+}
+
+.empty-message {
+    text-align: center;
+    color: #718096;
+    font-style: italic;
+    padding: 20px;
+}
