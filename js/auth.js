@@ -1,6 +1,9 @@
+// auth.js
 class AuthManager {
     constructor() {
         this.currentUser = null;
+        this.supabase = window.SupabaseConfig.supabase;
+        this.USER_ROLES = window.SupabaseConfig.USER_ROLES;
         this.initEventListeners();
         this.checkAuth();
     }
@@ -57,6 +60,7 @@ class AuthManager {
     
     showAuthError(message) {
         document.getElementById('auth-error').textContent = message;
+        document.getElementById('auth-error').style.display = 'block';
     }
     
     async login() {
@@ -70,7 +74,7 @@ class AuthManager {
         
         try {
             // Получаем пользователя из базы
-            const { data: user, error } = await supabase
+            const { data: user, error } = await this.supabase
                 .from('users')
                 .select('*')
                 .eq('username', username)
@@ -88,7 +92,7 @@ class AuthManager {
             }
             
             // Обновляем время последнего входа
-            await supabase
+            await this.supabase
                 .from('users')
                 .update({ last_login: new Date().toISOString() })
                 .eq('id', user.id);
@@ -139,7 +143,7 @@ class AuthManager {
         
         try {
             // Проверяем, существует ли пользователь
-            const { data: existingUser } = await supabase
+            const { data: existingUser } = await this.supabase
                 .from('users')
                 .select('id')
                 .or(`username.eq.${username},email.eq.${email}`)
@@ -153,14 +157,14 @@ class AuthManager {
             // Создаем нового пользователя
             const passwordHash = btoa(password);
             
-            const { data: user, error } = await supabase
+            const { data: user, error } = await this.supabase
                 .from('users')
                 .insert([
                     {
                         username,
                         email,
                         password_hash: passwordHash,
-                        role: USER_ROLES.PLAYER
+                        role: this.USER_ROLES.PLAYER
                     }
                 ])
                 .select()
@@ -189,47 +193,53 @@ class AuthManager {
         const authScreen = document.getElementById('auth-screen');
         const mainPanel = document.getElementById('main-panel');
         
-        // Проверяем подключение к Supabase
-        const isConnected = await checkSupabaseConnection();
-        if (!isConnected) {
-            this.showAuthError('Ошибка подключения к базе данных');
-            loadingScreen.classList.remove('active');
-            authScreen.classList.add('active');
-            return;
-        }
-        
-        // Создаем владельца если нужно
-        await createInitialOwner();
-        
-        // Проверяем авторизацию
-        const savedUser = sessionStorage.getItem('currentUser');
-        if (savedUser) {
-            try {
-                this.currentUser = JSON.parse(savedUser);
-                
-                // Проверяем актуальность данных
-                const { data: user, error } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', this.currentUser.id)
-                    .single();
-                
-                if (!error && user) {
-                    this.currentUser = user;
-                    this.showMainPanel();
-                } else {
+        try {
+            // Проверяем подключение к Supabase
+            const isConnected = await window.SupabaseConfig.checkSupabaseConnection();
+            if (!isConnected) {
+                this.showAuthError('Ошибка подключения к базе данных');
+                loadingScreen.classList.remove('active');
+                authScreen.classList.add('active');
+                return;
+            }
+            
+            // Создаем владельца если нужно
+            await window.SupabaseConfig.createInitialOwner();
+            
+            // Проверяем авторизацию
+            const savedUser = sessionStorage.getItem('currentUser');
+            if (savedUser) {
+                try {
+                    this.currentUser = JSON.parse(savedUser);
+                    
+                    // Проверяем актуальность данных
+                    const { data: user, error } = await this.supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', this.currentUser.id)
+                        .single();
+                    
+                    if (!error && user) {
+                        this.currentUser = user;
+                        this.showMainPanel();
+                    } else {
+                        sessionStorage.removeItem('currentUser');
+                        this.showAuthScreen();
+                    }
+                } catch (error) {
+                    console.error('Ошибка проверки пользователя:', error);
                     sessionStorage.removeItem('currentUser');
                     this.showAuthScreen();
                 }
-            } catch (error) {
-                sessionStorage.removeItem('currentUser');
+            } else {
                 this.showAuthScreen();
             }
-        } else {
-            this.showAuthScreen();
+        } catch (error) {
+            console.error('Ошибка инициализации:', error);
+            this.showAuthError('Ошибка загрузки системы');
+        } finally {
+            loadingScreen.classList.remove('active');
         }
-        
-        loadingScreen.classList.remove('active');
     }
     
     showAuthScreen() {
@@ -267,10 +277,10 @@ class AuthManager {
         const adminItems = document.querySelectorAll('.admin-only');
         const ownerItems = document.querySelectorAll('.owner-only');
         
-        if (this.currentUser.role === USER_ROLES.OWNER) {
+        if (this.currentUser.role === this.USER_ROLES.OWNER) {
             adminItems.forEach(item => item.style.display = 'flex');
             ownerItems.forEach(item => item.style.display = 'flex');
-        } else if (this.currentUser.role === USER_ROLES.ADMIN) {
+        } else if (this.currentUser.role === this.USER_ROLES.ADMIN) {
             adminItems.forEach(item => item.style.display = 'flex');
             ownerItems.forEach(item => item.style.display = 'none');
         } else {
@@ -281,9 +291,9 @@ class AuthManager {
     
     getRoleName(role) {
         const roleNames = {
-            [USER_ROLES.OWNER]: 'Владелец',
-            [USER_ROLES.ADMIN]: 'Администратор',
-            [USER_ROLES.PLAYER]: 'Игрок'
+            [this.USER_ROLES.OWNER]: 'Владелец',
+            [this.USER_ROLES.ADMIN]: 'Администратор',
+            [this.USER_ROLES.PLAYER]: 'Игрок'
         };
         return roleNames[role] || 'Игрок';
     }
@@ -309,7 +319,7 @@ class AuthManager {
     
     async addLog(action, userId = null) {
         try {
-            await supabase
+            await this.supabase
                 .from('system_logs')
                 .insert([
                     {
